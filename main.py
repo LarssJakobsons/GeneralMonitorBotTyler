@@ -35,6 +35,8 @@ bot = interactions.Client(
     sync_interactions=True, intents=bot_intents, send_command_tracebacks=False
 )
 
+meloania_id = 970525263211397171
+tyler_id = 966090001668534394
 
 @listen()
 async def on_startup():
@@ -78,8 +80,10 @@ startup: <t:{round(startup)}:R>
 async def weekly(ctx):
     btn1 = Button(style=ButtonStyle.RED, custom_id="delete", emoji="🗑️")
     message = await ctx.send("Generating graph...", components=[btn1])
-
-    data = await get_week(db)
+    if ctx.channel.guild.id == meloania_id:
+        data = await get_week(db, "meloania")
+    elif ctx.channel.guild.id == tyler_id:
+        data = await get_week(db, "tyler")
 
     buf = gen_graph(
         data,
@@ -103,17 +107,29 @@ async def on_message(ctx: MessageCreate):
     message = ctx.message
     if message.author == bot.user:
         return
-    if message.channel.type == ChannelType.DM:
+    elif message.author.bot:
+        return
+    elif message.channel.type == ChannelType.DM:
         return
     else:
+        attachment_urls = []
+        if message.channel.guild.id == meloania_id:
+            server = "meloania"
+        elif message.channel.guild.id == tyler_id:
+            server = "tyler"
+        if message.attachments != []:
+            for attachment in message.attachments:
+                attachment_urls.append(attachment.url)
         await write_message(
             db,
             message.id,
             message.channel.id,
             message.content,
+            attachment_urls,
             message.author.id,
             message.timestamp,
             (message.timestamp).strftime("%Y-%m-%d"),
+            server
         )
 
 
