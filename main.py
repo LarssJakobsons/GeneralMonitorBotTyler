@@ -25,9 +25,9 @@ host = os.environ["MONGO_HOST"]
 conn_str = f"mongodb+srv://{username}:{password}@{host}/?retryWrites=true&w=majority"
 db = AsyncIOMotorClient(conn_str)
 
-# from keep_alive import start as thugshaker
+from keep_alive import start as keep_alive
 
-# thugshaker()
+keep_alive()
 
 bot_intents: Intents = Intents.DEFAULT | Intents.GUILD_MEMBERS | Intents.MESSAGE_CONTENT
 
@@ -37,6 +37,7 @@ bot = interactions.Client(
 
 meloania_id = 970525263211397171
 tyler_id = 966090001668534394
+
 
 @listen()
 async def on_startup():
@@ -97,9 +98,11 @@ async def weekly(ctx):
 
     priv_message = await bot.owner.send(file=File(file=buf, file_name="figure.png"))
     url = priv_message.attachments[0].url
-    embed = Embed(title="Weekly Activity", description="Weekly activity on the server", color=0xFFFFFF)
+    embed = Embed(
+        title="Weekly Activity", description="Weekly activity on the server", color=0xFFFFFF
+    )
     embed.set_image(url=url)
-    await message.edit(content="" ,embed=embed, components=[btn1])
+    await message.edit(content="", embed=embed, components=[btn1])
 
 
 @listen()
@@ -129,7 +132,7 @@ async def on_message(ctx: MessageCreate):
             message.author.id,
             message.timestamp,
             (message.timestamp).strftime("%Y-%m-%d"),
-            server
+            server,
         )
 
 
