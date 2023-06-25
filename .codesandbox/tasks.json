@@ -7,7 +7,19 @@
     "pip install -r requirements.txt && python3 bot.py": {
       "name": "Run bot",
       "command": "pip install -r requiriments.txt && python3 main.py",
-      "runAtStart": true
+      "runAtStart": true,
+      "preview": {
+        "port": 8080
+      },
+      "whitelist": [
+        "https://uptimerobot.com/"
+      ],
+      "autoReload": {
+        "enabled": true,
+        "include": [
+          "src"
+        ]
+      }
     }
   }
 }

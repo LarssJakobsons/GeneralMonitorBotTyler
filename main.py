@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 
 import matplotlib.pyplot as plt
 from io import BytesIO
-from mongo import get_week, write_message
+from mongo import get_week, write_message, get_day, get_month
 from datetime import datetime, timedelta
 from motor.motor_asyncio import AsyncIOMotorClient
 from pandas import DataFrame
@@ -77,7 +77,9 @@ startup: <t:{round(startup)}:R>
     )
 
 
-@slash_command(name="weekly", description="get the weekly acivity of the server")
+@slash_command(
+    name="weekly", description="get the weekly acivity of the server", dm_permission=False
+)
 async def weekly(ctx):
     btn1 = Button(style=ButtonStyle.RED, custom_id="delete", emoji="🗑️")
     message = await ctx.send("Generating graph...", components=[btn1])
@@ -100,6 +102,42 @@ async def weekly(ctx):
     url = priv_message.attachments[0].url
     embed = Embed(
         title="Weekly Activity", description="Weekly activity on the server", color=0xFFFFFF
+    )
+    embed.set_image(url=url)
+    await message.edit(content="", embed=embed, components=[btn1])
+
+
+@slash_command(name="day", description="get the activity in a set date", dm_permission=False)
+@slash_option(name="date", description="yyyy-mm-dd", required=True, opt_type=OptionType.STRING)
+async def daily(ctx, date: str):
+    btn1 = Button(style=ButtonStyle.RED, custom_id="delete", emoji="🗑️")
+    try:
+        date = datetime.strptime(date, "%Y-%m-%d")
+    except ValueError:
+        await ctx.send("Invalid date, please use the format `yyyy-mm-dd`", components=[btn1])
+        return
+    message = await ctx.send("Generating graph...", components=[btn1])
+    if ctx.channel.guild.id == meloania_id:
+        data = await get_day(db, "meloania", date)
+    elif ctx.channel.guild.id == tyler_id:
+        data = await get_day(db, "tyler", date)
+
+    buf = gen_graph(
+        data,
+        "Daily Activity",
+        "Time",
+        "Messages",
+        "red",
+        "o",
+        "-",
+    )
+
+    priv_message = await bot.owner.send(file=File(file=buf, file_name="figure.png"))
+    url = priv_message.attachments[0].url
+    embed = Embed(
+        title=date.strftime("%Y-%m-%d"),
+        description="Activity on the server on this date",
+        color=0xFFFFFF,
     )
     embed.set_image(url=url)
     await message.edit(content="", embed=embed, components=[btn1])
@@ -134,6 +172,42 @@ async def on_message(ctx: MessageCreate):
             (message.timestamp).strftime("%Y-%m-%d"),
             server,
         )
+
+
+@slash_command(name="month", description="get the activity in a month", dm_permission=False)
+@slash_option(name="month", description="yyyy-mm", required=True, opt_type=OptionType.STRING)
+async def monthly(ctx, month: str):
+    btn1 = Button(style=ButtonStyle.RED, custom_id="delete", emoji="🗑️")
+    try:
+        month = datetime.strptime(month, "%Y-%m")
+    except ValueError:
+        await ctx.send("Invalid month, please use the format `yyyy-mm`", components=[btn1])
+        return
+    message = await ctx.send("Generating graph...", components=[btn1])
+    if ctx.channel.guild.id == meloania_id:
+        data = await get_month(db, "meloania", month)
+    elif ctx.channel.guild.id == tyler_id:
+        data = await get_month(db, "tyler", month)
+
+    buf = gen_graph(
+        data,
+        "Monthly Activity",
+        "Date",
+        "Messages",
+        "red",
+        "o",
+        "-",
+    )
+
+    priv_message = await bot.owner.send(file=File(file=buf, file_name="figure.png"))
+    url = priv_message.attachments[0].url
+    embed = Embed(
+        title=month.strftime("%Y-%m"),
+        description="Activity of the serveer on this month",
+        color=0xFFFFFF,
+    )
+    embed.set_image(url=url)
+    await message.edit(content="", embed=embed, components=[btn1])
 
 
 @listen()
