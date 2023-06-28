@@ -13,6 +13,7 @@ from mongo import get_week, write_message, get_day, get_month
 from datetime import datetime, timedelta
 from motor.motor_asyncio import AsyncIOMotorClient
 from pandas import DataFrame
+import pandas as pd
 import numpy as np
 
 
@@ -46,8 +47,8 @@ async def on_startup():
     startup = time.mktime(datetime.utcnow().timetuple())
 
 
-def gen_graph(data, title, x_label, y_label, color, marker, linestyle):
-    data.plot(color=color, marker=marker, linestyle=linestyle)
+def gen_graph(data, title, x_label, y_label, color, marker, linestyle, line_width):
+    data.plot(color=color, marker=marker, linestyle=linestyle, linewidth=line_width)
     plt.grid(linewidth=0.5, color="black", axis="y")
     plt.title(title)
     plt.xlabel(x_label)
@@ -208,6 +209,131 @@ async def monthly(ctx, month: str):
     )
     embed.set_image(url=url)
     await message.edit(content="", embed=embed, components=[btn1])
+
+
+@slash_command(name="generategraph", description="Generate a graph")
+@slash_option(
+    name="title",
+    description="Set the title of the graph",
+    required=True,
+    opt_type=OptionType.STRING,
+)
+@slash_option(name="xvalue", description="Set the title of the X value", required=True, opt_type=OptionType.STRING)
+@slash_option(name="yvalue", description="Set the title of the Y value", required=True, opt_type=OptionType.STRING)
+@slash_option(
+    name="color",
+    description="Set the color of the graph",
+    required=True,
+    opt_type=OptionType.STRING,
+    choices=[
+        SlashCommandChoice(name="red", value="red"),
+        SlashCommandChoice(name="green", value="green"),
+        SlashCommandChoice(name="blue", value="blue"),
+        SlashCommandChoice(name="yellow", value="yellow"),
+        SlashCommandChoice(name="black", value="black"),
+        SlashCommandChoice(name="white", value="white"),
+        SlashCommandChoice(name="purple", value="purple"),
+        SlashCommandChoice(name="orange", value="orange"),
+        SlashCommandChoice(name="pink", value="pink"),
+        SlashCommandChoice(name="brown", value="brown"),
+        SlashCommandChoice(name="gray", value="gray"),
+        SlashCommandChoice(name="cyan", value="cyan"),
+    ],
+)
+@slash_option(
+    name="marker",
+    description="Set the marker of the graph",
+    required=True,
+    opt_type=OptionType.STRING,
+    choices=[
+        SlashCommandChoice(name="o", value="o"),
+        SlashCommandChoice(name="*", value="*"),
+        SlashCommandChoice(name=".", value="."),
+        SlashCommandChoice(name="+", value="+"),
+        SlashCommandChoice(name="x", value="x"),
+        SlashCommandChoice(name="s", value="s"),
+        SlashCommandChoice(name="d", value="d"),
+    ],
+)
+@slash_option(name="line", description="Set the line of the graph", required=True, opt_type=OptionType.STRING, choices=[
+        SlashCommandChoice(name="-", value="-"),
+        SlashCommandChoice(name="--", value="--"),
+        SlashCommandChoice(name="-.", value="-."),
+        SlashCommandChoice(name=":", value=":"),
+        SlashCommandChoice(name="steps", value="steps"),
+        SlashCommandChoice(name="None", value="None"),
+    ])
+@slash_option(name="line_width", description="Set the line width of the graph", required=True, opt_type=OptionType.INTEGER)
+# @slash_option(name="graph_type", description="Set the type of the graph", required=True, opt_type=OptionType.STRING, choices=[
+#         SlashCommandChoice(name="line", value="line"),
+#         SlashCommandChoice(name="bar", value="bar"),
+#     ])
+async def generate_plot(
+    ctx, title: str, xvalue: str, yvalue: str, color: str, marker: str, line: str, line_width:str 
+):
+    btn1 = Button(style=ButtonStyle.RED, custom_id="delete", emoji="🗑️")
+
+    # make data
+    x = 0
+    y = 0
+
+    modal = Modal(
+        ShortText(label="X values",required=True, placeholder="First opt, second opt, ...", custom_id="xvalues"),
+        ShortText(label="Y values",required=True, placeholder="(must be integer) 0, 1, 2, ...", custom_id="yvalues"),
+        title="Input graph data")
+    await ctx.send_modal(modal=modal)
+    modal_ctx: ModalContext = await ctx.bot.wait_for_modal(modal)
+
+    xval = modal_ctx.responses["xvalues"]
+    yval = modal_ctx.responses["yvalues"]
+
+
+    # generate a pandas dataframe from the xval and yval
+    xval = xval.split(",")
+    yval = yval.split(",")
+
+    if xval == "":
+        xval = "xval"
+    if yval == "":
+        yval = "yval"
+
+    # check if an xval has a yval
+    if len(xval) != len(yval):
+        await modal_ctx.send("Invalid X and Y values, there must be a Y value for each X value")
+        return
+
+    try:
+        yval = [int(i) for i in yval]
+    except ValueError:
+        await modal_ctx.send("Invalid Y values, must be integers")
+        return
+    
+    try:
+        xval = [int(i) for i in xval]
+    except ValueError:
+        pass
+    # generate a pandas dataframe from the xval and yval that will look like
+    # xval : yval
+
+    data = pd.DataFrame({"xval": xval, "yval": yval})
+    data.set_index("xval", inplace=True)
+    print(data)
+
+    buf = gen_graph(
+        data,
+        title,
+        xvalue,
+        yvalue,
+        color,
+        marker,
+        line,
+        line_width,
+    )
+    priv_message = await bot.owner.send(file=File(file=buf, file_name="figure.png"))
+    url = priv_message.attachments[0].url
+    embed = Embed(title="Custom graph", description=f"Custom generated graph by {ctx.author.mention}", color=0xFFFFFF)
+    embed.set_image(url=url)
+    await modal_ctx.send(content=f"{ctx.author.mention}, heres your graph!",embed=embed, components=[btn1])
 
 
 @listen()
