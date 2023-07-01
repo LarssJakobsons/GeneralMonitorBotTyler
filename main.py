@@ -47,7 +47,7 @@ async def on_startup():
     startup = time.mktime(datetime.utcnow().timetuple())
 
 
-def gen_graph(data, title, x_label, y_label, color, marker, linestyle, line_width):
+def gen_graph(data, title, x_label, y_label, color, marker, linestyle, line_width=1):
     data.plot(color=color, marker=marker, linestyle=linestyle, linewidth=line_width)
     plt.grid(linewidth=0.5, color="black", axis="y")
     plt.title(title)
