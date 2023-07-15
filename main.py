@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 
 import matplotlib.pyplot as plt
 from io import BytesIO
-from mongo import get_week, write_message, get_day, get_month
+from mongo import get_week, write_message, get_day, get_month, update_auto_update_message, get_auto_update_message
 from datetime import datetime, timedelta
 from motor.motor_asyncio import AsyncIOMotorClient
 from pandas import DataFrame
@@ -39,12 +39,53 @@ bot = interactions.Client(
 meloania_id = 970525263211397171
 tyler_id = 966090001668534394
 
+@Task.create(TimeTrigger(hour=0, minute=0))
+async def update_message():
+    server = "meloania"
+    if (server == "meloania"):
+        force_update = Button(style=ButtonStyle.BLUE, custom_id="force_update", emoji="🔄")
+
+        message = await get_auto_update_message(db, meloania_id)
+
+        meloania_auto_update_channel = bot.get_channel(1128402590925865121)
+
+        try:
+            message = await meloania_auto_update_channel.fetch_message(message)
+        except:
+            message = await meloania_auto_update_channel.send("No message found, please run /force_update to create one")
+            return
+
+        await message.edit(content="Updating...")
+        data = await get_week(db, "meloania")
+
+
+        buf = gen_graph(
+            data,
+            "Weekly Activity",
+            "Date",
+            "Messages",
+            "red",
+            "o",
+            "-",
+        )
+
+        priv_message = await bot.owner.send(file=File(file=buf, file_name="figure.png"))
+        url = priv_message.attachments[0].url
+        embed = Embed(
+            title="Weekly Activity", description="Weekly activity on the server", color=0xFFFFFF
+        )
+        embed.set_image(url=url)
+        await message.edit(content="", embed=embed, components=[force_update])
+        
+
 
 @listen()
 async def on_startup():
     print(f"{bot.user} has connected to Discord!")
     global startup
     startup = time.mktime(datetime.utcnow().timetuple())
+    # update_message.start(db=db, server="meloania")
+
 
 
 def gen_graph(data, title, x_label, y_label, color, marker, linestyle, line_width=1):
@@ -76,7 +117,6 @@ startup: <t:{round(startup)}:R>
 """,
         components=[btn1],
     )
-
 
 @slash_command(
     name="weekly", description="get the weekly acivity of the server", dm_permission=False
@@ -144,6 +184,52 @@ async def daily(ctx, date: str):
     await message.edit(content="", embed=embed, components=[btn1])
 
 
+@slash_command(name="force_update", description="Force update the automatic stats message", dm_permission=False, scopes=[970525263211397171])
+async def force_update(ctx):
+
+    if ctx.author.has_permission(Permissions.ADMINISTRATOR) or ctx.author == bot.owner:
+
+        force_update = Button(style=ButtonStyle.BLUE, custom_id="force_update", emoji="🔄")
+
+        meloania_auto_update_channel = bot.get_channel(1128402590925865121)
+
+        message = await get_auto_update_message(db, "meloania")
+        print(message)
+
+        if await meloania_auto_update_channel.fetch_message(message) == None:
+            message = await meloania_auto_update_channel.send("No message found, creating a new one...")
+            await update_auto_update_message(db, "meloania", message.id)
+        else:
+            message = await meloania_auto_update_channel.fetch_message(message)
+
+        client_msg = await ctx.send(content="Updating...")
+        if ctx.channel.guild.id == meloania_id:
+            data = await get_week(db, "meloania")
+        elif ctx.channel.guild.id == tyler_id:
+            data = await get_week(db, "tyler")
+
+        buf = gen_graph(
+            data,
+            "Weekly Activity",
+            "Date",
+            "Messages",
+            "red",
+            "o",
+            "-",
+        )
+
+        priv_message = await bot.owner.send(file=File(file=buf, file_name="figure.png"))
+        url = priv_message.attachments[0].url
+        embed = Embed(
+            title="Weekly Activity", description="Weekly activity on the server", color=0xFFFFFF
+        )
+        embed.set_image(url=url)
+        await message.edit(content="", embed=embed, components=[force_update])
+        await client_msg.edit(content="Succesfully updated the automatic stats message.")
+    else:
+        await ctx.send("Sorry, can't let you do that.", ephemeral=True)
+        return
+
 @listen()
 async def on_message(ctx: MessageCreate):
     message = ctx.message
@@ -185,10 +271,7 @@ async def monthly(ctx, month: str):
         await ctx.send("Invalid month, please use the format `yyyy-mm`", components=[btn1])
         return
     message = await ctx.send("Generating graph...", components=[btn1])
-    if ctx.channel.guild.id == meloania_id:
-        data = await get_month(db, "meloania", month)
-    elif ctx.channel.guild.id == tyler_id:
-        data = await get_month(db, "tyler", month)
+    data = await get_month(db, "meloania", month)
 
     buf = gen_graph(
         data,
@@ -347,6 +430,48 @@ async def on_component(ctx: ComponentContext):
             await event.message.delete()
         else:
             await event.send("Not your interaction.", ephemeral=True)
+    if event.custom_id == "force_update":
+        if not ctx.author.has_permission(Permissions.ADMINISTRATOR) or not ctx.author == bot.owner:
+            await ctx.send("Sorry, can't let you do that.", ephemeral=True)
+            return
+
+        force_update = Button(style=ButtonStyle.BLUE, custom_id="force_update", emoji="🔄")
+
+        message = await get_auto_update_message(db, ctx.guild.id)
+
+        meloania_auto_update_channel = bot.get_channel(1128402590925865121)
+
+        try:
+            message = await meloania_auto_update_channel.fetch_message(message)
+        except:
+            message = await meloania_auto_update_channel.send("No message found, creating a new one...")
+            await update_auto_update_message(db, ctx.guild.id, message.id)
+
+
+        await message.edit(content="Updating...")
+        if ctx.channel.guild.id == meloania_id:
+            data = await get_week(db, "meloania")
+        elif ctx.channel.guild.id == tyler_id:
+            data = await get_week(db, "tyler")
+
+        buf = gen_graph(
+            data,
+            "Weekly Activity",
+            "Date",
+            "Messages",
+            "red",
+            "o",
+            "-",
+        )
+
+        priv_message = await bot.owner.send(file=File(file=buf, file_name="figure.png"))
+        url = priv_message.attachments[0].url
+        embed = Embed(
+            title="Weekly Activity", description="Weekly activity on the server", color=0xFFFFFF
+        )
+        embed.set_image(url=url)
+        await message.edit(content="", embed=embed, components=[force_update])
+
 
 
 secret_token = os.environ["TOKEN"]

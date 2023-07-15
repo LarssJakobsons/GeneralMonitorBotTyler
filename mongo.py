@@ -3,25 +3,27 @@ from dotenv import load_dotenv
 from beanie import Document, init_beanie
 from motor.motor_asyncio import AsyncIOMotorClient
 import asyncio
-import datetime
 from beanie import init_beanie
 from beanie.odm.documents import Document
 from datetime import datetime, timedelta
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
+import json
 
 
 class Messages(Document):
     id: int
     channel_id: int
-    attachments: list
+    attachments: list[str]
     content: str
     author_id: int
     long_date: datetime
     # short date will be in a format like this: yyyy-mm-dd
     short_date: str
 
+class AutoUpdateChannel(Document):
+    message_id: int
 
 async def get_week(db, server):
     end_date = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
@@ -153,3 +155,68 @@ async def get_month(db, server, date):
     results = results.reindex(pd.date_range(start=start_date, end=end_date, freq="D"), fill_value=0)
     results = results.astype(int)
     return results
+
+async def update_auto_update_message(db, server, message_id):
+    if server == "tyler":
+        await init_beanie(database=db.data, document_models=[AutoUpdateChannel])
+    elif server == "meloania":
+        await init_beanie(database=db.meloania, document_models=[AutoUpdateChannel])
+    await AutoUpdateChannel.delete_all()
+    channel = AutoUpdateChannel(message_id=message_id)
+    await channel.save()
+
+async def get_auto_update_message(db, server):
+    if server == "tyler":
+        await init_beanie(database=db.data, document_models=[AutoUpdateChannel])
+    elif server == "meloania":
+        await init_beanie(database=db.meloania, document_models=[AutoUpdateChannel])
+
+    cursor = AutoUpdateChannel.find({})
+    results = await cursor.to_list(None)
+    # get the message_id
+    if len(results) == 0:
+        return 0
+    else:
+        return results[0].message_id
+
+
+
+
+async def export_db(server):
+
+    load_dotenv()
+
+    username = os.environ["MONGO_USERNAME"]
+    password = os.environ["MONGO_PASSWORD"]
+    host = os.environ["MONGO_HOST"]
+
+    conn_str = f"mongodb+srv://{username}:{password}@{host}/?retryWrites=true&w=majority"
+    db = AsyncIOMotorClient(conn_str)
+
+    if server == "tyler":
+        await init_beanie(database=db.data, document_models=[Messages])
+    elif server == "meloania":
+        await init_beanie(database=db.meloania, document_models=[Messages])
+
+    cursor = Messages.find({})
+
+    results = await cursor.to_list()
+
+    with open("export.json", "w") as f:
+        json.dump(results, f, indent=4, default=str)
+    
+    return results
+
+async def main():
+    load_dotenv()
+
+    username = os.environ["MONGO_USERNAME"]
+    password = os.environ["MONGO_PASSWORD"]
+    host = os.environ["MONGO_HOST"]
+
+    conn_str = f"mongodb+srv://{username}:{password}@{host}/?retryWrites=true&w=majority"
+    db = AsyncIOMotorClient(conn_str)
+    print(await get_auto_update_message(db, "meloania"))
+
+if __name__ == "__main__":
+    asyncio.run(main())
