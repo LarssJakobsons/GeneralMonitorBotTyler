@@ -431,46 +431,48 @@ async def on_component(ctx: ComponentContext):
         else:
             await event.send("Not your interaction.", ephemeral=True)
     if event.custom_id == "force_update":
-        if not ctx.author.has_permission(Permissions.ADMINISTRATOR) or not ctx.author == bot.owner:
-            await ctx.send("Sorry, can't let you do that.", ephemeral=True)
+        if event.author.has_permission(Permissions.ADMINISTRATOR) or event.author == bot.owner:
+            btn1 = Button(style=ButtonStyle.RED, custom_id="delete", emoji="🗑️")
+            force_update = Button(style=ButtonStyle.BLUE, custom_id="force_update", emoji="🔄")
+
+            meloania_auto_update_channel = bot.get_channel(1128402590925865121)
+
+            message = await get_auto_update_message(db, "meloania")
+            print(message)
+
+            if await meloania_auto_update_channel.fetch_message(message) == None:
+                message = await meloania_auto_update_channel.send("No message found, creating a new one...")
+                await update_auto_update_message(db, "meloania", message.id)
+            else:
+                message = await meloania_auto_update_channel.fetch_message(message)
+
+            client_msg = await event.send(content="Updating...")
+            if event.channel.guild.id == meloania_id:
+                data = await get_week(db, "meloania")
+            elif event.channel.guild.id == tyler_id:
+                data = await get_week(db, "tyler")
+
+            buf = gen_graph(
+                data,
+                "Weekly Activity",
+                "Date",
+                "Messages",
+                "red",
+                "o",
+                "-",
+            )
+
+            priv_message = await bot.owner.send(file=File(file=buf, file_name="figure.png"))
+            url = priv_message.attachments[0].url
+            embed = Embed(
+                title="Weekly Activity", description="Weekly activity on the server", color=0xFFFFFF
+            )
+            embed.set_image(url=url)
+            await message.edit(content="", embed=embed, components=[force_update])
+            await client_msg.edit(content="Succesfully updated the automatic stats message.", components=[btn1])
+        else:
+            await event.send("Sorry, can't let you do that.", ephemeral=True)
             return
-
-        force_update = Button(style=ButtonStyle.BLUE, custom_id="force_update", emoji="🔄")
-
-        message = await get_auto_update_message(db, ctx.guild.id)
-
-        meloania_auto_update_channel = bot.get_channel(1128402590925865121)
-
-        try:
-            message = await meloania_auto_update_channel.fetch_message(message)
-        except:
-            message = await meloania_auto_update_channel.send("No message found, creating a new one...")
-            await update_auto_update_message(db, ctx.guild.id, message.id)
-
-
-        await message.edit(content="Updating...")
-        if ctx.channel.guild.id == meloania_id:
-            data = await get_week(db, "meloania")
-        elif ctx.channel.guild.id == tyler_id:
-            data = await get_week(db, "tyler")
-
-        buf = gen_graph(
-            data,
-            "Weekly Activity",
-            "Date",
-            "Messages",
-            "red",
-            "o",
-            "-",
-        )
-
-        priv_message = await bot.owner.send(file=File(file=buf, file_name="figure.png"))
-        url = priv_message.attachments[0].url
-        embed = Embed(
-            title="Weekly Activity", description="Weekly activity on the server", color=0xFFFFFF
-        )
-        embed.set_image(url=url)
-        await message.edit(content="", embed=embed, components=[force_update])
 
 
 
