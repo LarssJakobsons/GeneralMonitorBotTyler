@@ -424,7 +424,7 @@ async def on_component(ctx: ComponentContext):
     event = ctx.ctx
     if event.custom_id == "delete":
         if (
-            event.message.interaction._user_id == event.author.id
+            event.message.interaction.user.id == event.author.id
             or event.author.has_permission(Permissions.MANAGE_MESSAGES) == True
         ):
             await event.message.delete()
@@ -446,7 +446,6 @@ async def on_component(ctx: ComponentContext):
             else:
                 message = await meloania_auto_update_channel.fetch_message(message)
 
-            client_msg = await event.send(content="Updating...")
             if event.channel.guild.id == meloania_id:
                 data = await get_week(db, "meloania")
             elif event.channel.guild.id == tyler_id:
@@ -469,7 +468,6 @@ async def on_component(ctx: ComponentContext):
             )
             embed.set_image(url=url)
             await message.edit(content="", embed=embed, components=[force_update])
-            await client_msg.edit(content="Succesfully updated the automatic stats message.", components=[btn1])
         else:
             await event.send("Sorry, can't let you do that.", ephemeral=True)
             return
