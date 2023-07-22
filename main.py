@@ -424,7 +424,7 @@ async def on_component(ctx: ComponentContext):
     event = ctx.ctx
     if event.custom_id == "delete":
         if (
-            event.message.interaction.user.id == event.author.id
+            event.message.interaction._user_id == event.author.id
             or event.author.has_permission(Permissions.MANAGE_MESSAGES) == True
         ):
             await event.message.delete()
